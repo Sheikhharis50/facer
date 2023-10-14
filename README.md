@@ -1,6 +1,6 @@
 # Facer
 
-Its a face recognition system made using this [demo](https://realpython.com/face-recognition-with-python/#demo)
+Its a face recognition system to detect faces using trained model.
 
 ## Prerequisites
 
@@ -10,14 +10,31 @@ Its a face recognition system made using this [demo](https://realpython.com/face
 
 ## QuickStart
 
-Create virtual env
+1. Create virtual env
 
 ```bash
 poetry shell
 ```
 
-Install dependencies
+2. Install dependencies
 
 ```bash
 poetry install
 ```
+
+3. Run `facer`
+
+```bash
+python main.py --encode --model [MODEL_NAME='hog|cnn'] --image [IMAGE_PATH]
+```
+
+_eg:_
+
+```bash
+python main.py --encode --model hog --image 'dataset/val/elon_musk/161856.jpg'
+```
+
+## Refrences
+
+- [face-recognition-with-python](https://realpython.com/face-recognition-with-python/#demo)
+- [real-time-object-detection-with-yolo](https://dipankarmedh1.medium.com/real-time-object-detection-with-yolo-and-webcam-enhancing-your-computer-vision-skills-861b97c78993)
