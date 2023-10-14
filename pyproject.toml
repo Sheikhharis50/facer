@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "facer"
+version = "0.1.0"
+description = ""
+authors = ["Sheikh Haris Zahid <sheikh.haris.zahid@hotmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+dlib = "^19.24.2"
+face-recognition = "^1.3.0"
+numpy = "^1.26.0"
+pillow = "^10.0.1"
+olefile = "^0.46"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.9.1"
+ipython = "^8.16.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
