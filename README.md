@@ -57,3 +57,7 @@ python main.py --model hog
 
 - [face-recognition-with-python](https://realpython.com/face-recognition-with-python/#demo)
 - [real-time-object-detection-with-yolo](https://dipankarmedh1.medium.com/real-time-object-detection-with-yolo-and-webcam-enhancing-your-computer-vision-skills-861b97c78993)
+
+## Author
+
+- [Sheikh Haris Zahid](https://github.com/sheikhharis50)
