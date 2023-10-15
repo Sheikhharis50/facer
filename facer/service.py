@@ -1,9 +1,12 @@
 import logging
 import pickle
 from collections import Counter
+from os import name
 from pathlib import Path
 
+import cv2
 import face_recognition
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from . import configs, exceptions
@@ -87,8 +90,8 @@ def __get_text_dimensions(text: str, font):
     # https://stackoverflow.com/a/46220683/9263761
     ascent, descent = font.getmetrics()
 
-    text_width = font.getmask(text).getbbox()[2] - ascent
-    text_height = font.getmask(text).getbbox()[3] + descent
+    text_width = font.getmask(text).getbbox()[2] - (ascent + descent)
+    text_height = font.getmask(text).getbbox()[3]
 
     return text_width, text_height
 
@@ -115,81 +118,100 @@ def __match_encodings(unknown_encoding, loaded_encodings):
         return ratings.most_common(1)[0][0]
 
 
-def __display_face(draw, bounding_box: tuple, name: str):
+def __draw_faces(image: np.ndarray, bounding_boxes: list[tuple], names: list[str]):
     """
-    The function `__display_face` takes in parameters for drawing a bounding box and name on an image.
+    The function `__draw_faces` takes an image, a list of bounding boxes, and a list of names, and draws
+    rectangles and text on the image corresponding to each bounding box and name.
 
-    :param draw: The "draw" parameter is an object that represents the drawing context. It is used to
-    draw shapes, text, and other elements on an image
-    :param bounding_box: The bounding_box parameter is a tuple that represents the coordinates of the
-    bounding box around a face. It contains four values: top, right, bottom, and left. These values
-    specify the position of the top-left and bottom-right corners of the bounding box
-    :param name: The `name` parameter is a string that represents the name or label associated with the
-    bounding box. It is used to display the name on top of the bounding box in the image
+    :param image: The `image` parameter is a NumPy array representing an image. It is expected to have
+    shape (height, width, channels) where channels can be 1 (grayscale) or 3 (RGB)
+    :type image: np.ndarray
+    :param bounding_boxes: The `bounding_boxes` parameter is a list of tuples, where each tuple
+    represents the coordinates of a bounding box. Each tuple should contain four values: the top, right,
+    bottom, and left coordinates of the bounding box. These coordinates define the rectangular region
+    around a face in the image
+    :type bounding_boxes: list[tuple]
+    :param names: The `names` parameter is a list of strings that represents the names of the faces
+    detected in the image. Each name corresponds to a bounding box in the `bounding_boxes` parameter
+    :type names: list[str]
+    :return: a Pillow Image object.
     """
-    top, right, bottom, left = bounding_box
-    draw.rectangle(((left, top), (right, bottom)), outline=configs.BOUNDING_BOX_COLOR)
-    text_left, text_top, text_right, text_bottom = draw.textbbox((left, bottom), name)
-    font = ImageFont.truetype("Arial.ttf", 50)
-    font_width, font_height = __get_text_dimensions(name, font)
-    draw.rectangle(
-        (
+    pillow_image = Image.fromarray(image)
+    draw = ImageDraw.Draw(pillow_image)
+
+    for bounding_box, name in zip(bounding_boxes, names):
+        top, right, bottom, left = bounding_box
+        draw.rectangle(
+            ((left, top), (right, bottom)), outline=configs.BOUNDING_BOX_COLOR
+        )
+        text_left, text_top, text_right, text_bottom = draw.textbbox(
+            (left, bottom), name
+        )
+        font = ImageFont.truetype("Arial.ttf", 20)
+        font_width, font_height = __get_text_dimensions(name, font)
+        draw.rectangle(
+            (
+                (text_left, text_top),
+                (text_right + font_width, text_bottom + font_height),
+            ),
+            fill=configs.BOUNDING_BOX_COLOR,
+            outline=configs.BOUNDING_BOX_COLOR,
+        )
+        draw.text(
             (text_left, text_top),
-            (text_right + font_width, text_bottom + font_height),
-        ),
-        fill=configs.BOUNDING_BOX_COLOR,
-        outline=configs.BOUNDING_BOX_COLOR,
-    )
-    draw.text(
-        (text_left, text_top),
-        name,
-        font=font,
-        fill=configs.TEXT_COLOR,
-    )
+            name,
+            font=font,
+            fill=configs.TEXT_COLOR,
+        )
+
+    del draw
+    return pillow_image
 
 
 def recognize_face(
-    image_path: str,
+    image: str | np.ndarray,
     model: str = "hog",
-) -> None:
+) -> Image.Image:
     """
-    The `recognize_face` function takes an image path and a model type as input, loads pre-trained face
-    encodings, detects faces in the input image, matches the detected faces with the loaded encodings,
-    and displays the recognized faces with their bounding boxes.
+    The `recognize_face` function takes an image and a model as input, loads pre-trained face encodings,
+    detects faces in the input image, matches the detected faces with the loaded encodings, and returns
+    the input image with bounding boxes and names drawn around the recognized faces.
 
-    :param image_path: The `image_path` parameter is a string that represents the file path of the image
-    you want to recognize faces in
-    :type image_path: str
+    :param image: The `image` parameter is the input image that you want to recognize faces in. It can
+    be either a string representing the path to the image file or a NumPy array representing the image
+    itself
+    :type image: str | np.ndarray
     :param model: The `model` parameter in the `recognize_face` function is used to specify the face
     detection model to be used. The default value is set to "hog", which stands for Histogram of
-    Oriented Gradients. This is a faster model but may not be as accurate as other models like ",
-    defaults to hog
+    Oriented Gradients. This is a popular and relatively fast face detection algorithm. Other possible
+    values for the, defaults to hog
     :type model: str (optional)
+    :return: The function `recognize_face` returns an instance of the `Image.Image` class.
     """
     encodings_path = Path(configs.OUTPUT_PATH, f"{model}_encodings.pkl")
     with encodings_path.open(mode="rb") as f:
         loaded_encodings = pickle.load(f)
 
-    input_image = face_recognition.load_image_file(image_path)
+    if isinstance(image, np.ndarray):
+        input_image = image
+    else:
+        input_image = face_recognition.load_image_file(image)
 
     input_face_locations = face_recognition.face_locations(input_image, model=model)
     input_face_encodings = face_recognition.face_encodings(
         input_image, input_face_locations
     )
 
-    pillow_image = Image.fromarray(input_image)
-    draw = ImageDraw.Draw(pillow_image)
-
+    bounding_boxes, names = [], []
     for bounding_box, unknown_encoding in zip(
         input_face_locations, input_face_encodings
     ):
-        name = __match_encodings(unknown_encoding, loaded_encodings) or "Unknown"
-        logger.info("Name: %s", name)
-        logger.info("Bounding Box: %s", bounding_box)
-        __display_face(draw, bounding_box, name)
+        names.append(__match_encodings(unknown_encoding, loaded_encodings) or "Unknown")
+        bounding_boxes.append(bounding_box)
 
-    del draw
-    pillow_image.show()
+    logger.debug("Names: %s", names)
+    logger.debug("Bounding Boxes: %s", bounding_boxes)
+    return __draw_faces(input_image, bounding_boxes, names)
 
 
 def validate(model: str = "hog"):
@@ -207,4 +229,34 @@ def validate(model: str = "hog"):
             if not filepath.is_file():
                 return
 
-            recognize_face(image_path=str(filepath.absolute()), model=model)
+            recognize_face(image=str(filepath.absolute()), model=model).show()
+
+
+def run(width: int = 1280, height: int = 720):
+    """
+    The function captures video from a webcam, sets the width and height of the video, continuously
+    reads frames from the video, recognizes faces in each frame, and displays the frames with recognized
+    faces in a window until the user presses "q".
+
+    :param width: The `width` parameter is used to set the width of the video capture window. It
+    determines the width of the video frame that will be captured from the webcam. The default value is
+    set to 1280 pixels, defaults to 1280
+    :type width: int (optional)
+    :param height: The `height` parameter is used to set the height of the video capture window. It
+    determines the vertical size of the video frame that will be displayed, defaults to 720
+    :type height: int (optional)
+    """
+    cap = cv2.VideoCapture(0)
+    cap.set(3, width)
+    cap.set(4, height)
+
+    while True:
+        ret, img = cap.read()
+        drawn_image = recognize_face(img)
+        cv2.imshow("Webcam", np.array(drawn_image))
+
+        if cv2.waitKey(1) == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
