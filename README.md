@@ -34,7 +34,7 @@ _eg:_
 python main.py --encode --model hog --image 'dataset/val/elon_musk/161856.jpg'
 ```
 
-## Refrences
+## References
 
 - [face-recognition-with-python](https://realpython.com/face-recognition-with-python/#demo)
 - [real-time-object-detection-with-yolo](https://dipankarmedh1.medium.com/real-time-object-detection-with-yolo-and-webcam-enhancing-your-computer-vision-skills-861b97c78993)
