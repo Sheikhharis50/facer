@@ -1,7 +1,6 @@
 import logging
 import pickle
 from collections import Counter
-from os import name
 from pathlib import Path
 from typing import Any
 
@@ -126,38 +125,37 @@ def __match_encodings(unknown_encoding, loaded_encodings):
     "encodings" and "names"
     :return: the name of the person with the most number of matches in the loaded encodings.
     """
-    boolean_matches = face_recognition.compare_faces(
+    matches = face_recognition.compare_faces(
         loaded_encodings["encodings"], unknown_encoding
     )
     if ratings := Counter(
-        name for match, name in zip(boolean_matches, loaded_encodings["names"]) if match
+        name for match, name in zip(matches, loaded_encodings["names"]) if match
     ):
         logger.debug("Ratings against each class: %s", ratings)
         return ratings.most_common(1)[0][0]
 
 
-def __draw_faces(image: np.ndarray, bounding_boxes: list[tuple], names: list[str]):
+def draw_faces(frame: np.ndarray, face_locations: list[tuple], face_names: list[str]):
     """
-    The function `__draw_faces` takes an image, a list of bounding boxes, and a list of names, and draws
-    rectangles and text on the image corresponding to each bounding box and name.
+    The function `draw_faces` takes in a frame, face locations, and face names, and returns an image
+    with bounding boxes and text labels drawn around the detected faces.
 
-    :param image: The `image` parameter is a NumPy array representing an image. It is expected to have
-    shape (height, width, channels) where channels can be 1 (grayscale) or 3 (RGB)
-    :type image: np.ndarray
-    :param bounding_boxes: The `bounding_boxes` parameter is a list of tuples, where each tuple
-    represents the coordinates of a bounding box. Each tuple should contain four values: the top, right,
-    bottom, and left coordinates of the bounding box. These coordinates define the rectangular region
-    around a face in the image
-    :type bounding_boxes: list[tuple]
-    :param names: The `names` parameter is a list of strings that represents the names of the faces
-    detected in the image. Each name corresponds to a bounding box in the `bounding_boxes` parameter
-    :type names: list[str]
-    :return: a Pillow Image object.
+    :param frame: The `frame` parameter is a numpy array representing an image frame. It is the input
+    image on which the faces will be drawn
+    :type frame: np.ndarray
+    :param face_locations: The `face_locations` parameter is a list of tuples, where each tuple
+    represents the bounding box coordinates of a detected face in the frame. The bounding box
+    coordinates are in the format `(top, right, bottom, left)`, where `top` is the y-coordinate of the
+    top edge of the
+    :type face_locations: list[tuple]
+    :param face_names: The `face_names` parameter is a list of strings that contains the names of the
+    faces detected in the frame. Each name corresponds to a face location in the `face_locations` list
+    :type face_names: list[str]
     """
-    pillow_image = Image.fromarray(image)
+    pillow_image = Image.fromarray(frame)
     draw = ImageDraw.Draw(pillow_image)
 
-    for bounding_box, name in zip(bounding_boxes, names):
+    for bounding_box, name in zip(face_locations, face_names):
         top, right, bottom, left = bounding_box
         draw.rectangle(
             ((left, top), (right, bottom)), outline=configs.BOUNDING_BOX_COLOR
@@ -183,52 +181,94 @@ def __draw_faces(image: np.ndarray, bounding_boxes: list[tuple], names: list[str
         )
 
     del draw
-    return pillow_image
+    pillow_image.show()
+
+
+def draw_faces_cv2(
+    frame: np.ndarray, face_locations: list[tuple], face_names: list[str]
+):
+    """
+    The function `draw_faces_cv2` takes in a frame, face locations, and face names, and draws boxes
+    around the faces and labels with names below the faces in the frame.
+
+    :param frame: The `frame` parameter is a numpy array representing an image frame. It is the frame in
+    which the faces are detected and where the faces will be drawn
+    :type frame: np.ndarray
+    :param face_locations: The `face_locations` parameter is a list of tuples representing the bounding
+    box coordinates of each detected face in the frame. Each tuple contains four values: `(top, right,
+    bottom, left)`. These values represent the pixel coordinates of the top, right, bottom, and left
+    edges of the bounding
+    :type face_locations: list[tuple]
+    :param face_names: The `face_names` parameter is a list of strings that contains the names of the
+    individuals whose faces are detected in the frame. Each name corresponds to a specific face location
+    in the `face_locations` list
+    :type face_names: list[str]
+    """
+    # Display the results
+    for (top, right, bottom, left), name in zip(face_locations, face_names):
+        # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+        top *= 4
+        right *= 4
+        bottom *= 4
+        left *= 4
+
+        # Draw a box around the face
+        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+        # Draw a label with a name below the face
+        cv2.rectangle(
+            frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED
+        )
+        font = cv2.FONT_HERSHEY_DUPLEX
+        cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+    # Display the resulting image
+    cv2.imshow("Video", frame)
 
 
 def recognize_face(
     image: str | np.ndarray,
     encodings: Any,
     model: str = configs.DEFAULT_MODEL,
-) -> Image.Image:
+) -> tuple[np.ndarray, list[tuple[int, Any, Any, int]], list[Any | str]]:
     """
-    The `recognize_face` function takes an image and a set of face encodings, and returns the image with
-    recognized faces highlighted.
+    The `recognize_face` function takes an image, face encodings, and an optional model as input, and
+    returns the image frame, face locations, and face names.
 
     :param image: The `image` parameter can be either a string representing the file path of an image or
     a numpy array representing the image itself
     :type image: str | np.ndarray
-    :param encodings: The `encodings` parameter is a collection of known face encodings. These encodings
-    are used to compare and match with the face encodings extracted from the input image. The
-    `encodings` parameter can be of any type, but it should contain the face encodings in a format that
-    can
+    :param encodings: The `encodings` parameter is a variable that represents a collection of known face
+    encodings. These encodings are used to compare and match against the face encodings of the faces
+    detected in the input image. The `encodings` variable can be of any type, but it should contain the
+    necessary
     :type encodings: Any
-    :param model: The `model` parameter is a string that specifies the face detection model to be used.
-    It is set to `configs.DEFAULT_MODEL` by default, which means it will use the default face detection
-    model specified in the `configs` module. You can change the value of `model` to use a
+    :param model: The `model` parameter is used to specify the face detection model to be used. It is an
+    optional parameter with a default value of `configs.DEFAULT_MODEL`. The `configs.DEFAULT_MODEL` is
+    likely a constant or variable defined elsewhere in the code, which holds the default model value
     :type model: str
-    :return: The function `recognize_face` returns an instance of the `Image.Image` class.
+    :return: The function `recognize_face` returns a tuple containing three elements:
+    1. `frame`: An ndarray representing the image frame.
+    2. `face_locations`: A list of tuples, where each tuple contains four integers representing the
+    coordinates of a detected face's bounding box (top, right, bottom, left).
+    3. `face_names`: A list of strings or objects representing the names or labels associated
     """
     if isinstance(image, np.ndarray):
-        input_image = image
+        frame = image
     else:
-        input_image = face_recognition.load_image_file(image)
+        frame = face_recognition.load_image_file(image)
 
-    input_face_locations = face_recognition.face_locations(input_image, model=model)
-    input_face_encodings = face_recognition.face_encodings(
-        input_image, input_face_locations
-    )
+    face_locations = face_recognition.face_locations(frame, model=model)
+    face_encodings = face_recognition.face_encodings(frame, face_locations, model=model)
 
-    bounding_boxes, names = [], []
-    for bounding_box, unknown_encoding in zip(
-        input_face_locations, input_face_encodings
-    ):
-        names.append(__match_encodings(unknown_encoding, encodings) or "Unknown")
-        bounding_boxes.append(bounding_box)
+    face_names = [
+        (__match_encodings(unknown_encoding, encodings) or "Unknown")
+        for unknown_encoding in face_encodings
+    ]
 
-    logger.debug("Names: %s", names)
-    logger.debug("Bounding Boxes: %s", bounding_boxes)
-    return __draw_faces(input_image, bounding_boxes, names)
+    logger.debug("Names: %s", face_names)
+    logger.debug("Bounding Boxes: %s", face_locations)
+    return frame, face_locations, face_names
 
 
 def validate(encodings: Any, model: str = configs.DEFAULT_MODEL):
@@ -250,11 +290,13 @@ def validate(encodings: Any, model: str = configs.DEFAULT_MODEL):
             if not filepath.is_file():
                 return
 
-            recognize_face(
-                image=str(filepath.absolute()),
-                encodings=encodings,
-                model=model,
-            ).show()
+            draw_faces(
+                *recognize_face(
+                    image=str(filepath.absolute()),
+                    encodings=encodings,
+                    model=model,
+                )
+            )
 
 
 def run(
@@ -264,34 +306,49 @@ def run(
     height: int = 720,
 ):
     """
-    The `run` function captures video from a webcam, recognizes faces in the video using given encodings
-    and model, and displays the video with recognized faces highlighted until the user presses 'q'.
+    The `run` function captures video from a webcam, detects faces in the video frames, and recognizes
+    the faces using a given set of encodings and model, displaying the recognized faces in real-time.
 
-    :param encodings: The `encodings` parameter is used to pass the face encodings that are used for
-    face recognition. These encodings are typically generated using a face recognition model and contain
-    the unique features of each face
+    :param encodings: The `encodings` parameter is a variable that contains the face encodings of known
+    faces. These encodings are used for face recognition to compare and match with the faces detected in
+    the video frames
     :type encodings: Any
     :param model: The `model` parameter is a string that specifies the face recognition model to be
-    used. It has a default value of `configs.DEFAULT_MODEL`, which suggests that there is a
-    configuration file named `configs` that contains a constant named `DEFAULT_MODEL`. The value of
-    `DEFAULT_MODEL` would determine which
+    used. It is set to `configs.DEFAULT_MODEL` by default, which suggests that there is a `configs`
+    module or file that contains a constant named `DEFAULT_MODEL`. The value of `DEFAULT_MODEL` would
+    determine
     :type model: str
-    :param width: The `width` parameter is used to set the width of the video capture frame. It
-    determines the width of the video stream that will be captured from the webcam. The default value is
-    set to 1280 pixels, defaults to 1280
+    :param width: The width parameter specifies the desired width of the video frame. It is used to set
+    the width of the video capture using the `cap.set(3, width)` method, defaults to 1280
     :type width: int (optional)
-    :param height: The `height` parameter is used to set the height of the video capture frame. It
-    determines the height of the video frame in pixels, defaults to 720
+    :param height: The `height` parameter is used to set the height of the video frame captured by the
+    webcam. It determines the vertical resolution of the video, defaults to 720
     :type height: int (optional)
     """
     cap = cv2.VideoCapture(0)
     cap.set(3, width)
     cap.set(4, height)
 
+    face_locations = []
+    face_names = []
+    process_this_frame = False
+
     while True:
-        ret, img = cap.read()
-        drawn_image = recognize_face(img, encodings=encodings, model=model)
-        cv2.imshow("Webcam", np.array(drawn_image))
+        # Grab a single frame of video
+        _, frame = cap.read()
+
+        # Only process every other frame of video to save time
+        if process_this_frame:
+            # Resize frame of video to 1/4 size for faster face recognition processing
+            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+
+            # Recognize the face in the frame
+            _, face_locations, face_names = recognize_face(
+                small_frame, encodings=encodings, model=model
+            )
+
+        process_this_frame = not process_this_frame
+        draw_faces_cv2(frame, face_locations, face_names)
 
         if cv2.waitKey(1) == ord("q"):
             break

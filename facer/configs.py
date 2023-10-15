@@ -40,7 +40,7 @@ LOGGING = {
     "loggers": {
         "root": {
             "handlers": ["console"],
-            "level": logging.INFO,
+            "level": logging.DEBUG,
             "propagate": False,
         },
     },

@@ -3,7 +3,14 @@ from logging import config
 from pathlib import Path
 
 from facer.configs import LOGGING
-from facer.service import encode, load_encodings, recognize_face, run, validate
+from facer.service import (
+    draw_faces,
+    encode,
+    load_encodings,
+    recognize_face,
+    run,
+    validate,
+)
 
 
 def main(args: Namespace):
@@ -19,7 +26,9 @@ def main(args: Namespace):
         if not (image_path := Path(args.image)).exists():
             raise FileNotFoundError(str(image_path))
 
-        recognize_face(str(image_path), encodings=encodings, model=args.model).show()
+        draw_faces(
+            *recognize_face(str(image_path), encodings=encodings, model=args.model)
+        )
         return
 
     run(encodings, model=args.model)
