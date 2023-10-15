@@ -17,7 +17,14 @@ BOUNDING_BOX_COLOR = "blue"
 
 TEXT_COLOR = "white"
 
-IMAGE_FORMATS = ["png", "jpg", "jpeg"]
+IMAGE_FORMATS = [
+    "png",
+    "PNG",
+    "jpg",
+    "JPG",
+    "jpeg",
+    "JPEG",
+]
 
 
 LOGGING = {
