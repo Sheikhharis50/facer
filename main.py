@@ -3,12 +3,19 @@ from logging import config
 from pathlib import Path
 
 from facer.configs import LOGGING
-from facer.service import encode_known_faces, recognize_face, run, validate
+from facer.service import (
+    encode_known_faces,
+    load_encodings,
+    recognize_face,
+    run,
+    validate,
+)
 
 
 def main(args: Namespace):
     if args.encode:
         encode_known_faces(args.model)
+    encodings = load_encodings(args.model)
 
     if args.validate:
         validate(args.model)
@@ -18,10 +25,10 @@ def main(args: Namespace):
         if not (image_path := Path(args.image)).exists():
             raise FileNotFoundError(str(image_path))
 
-        recognize_face(str(image_path), args.model).show()
+        recognize_face(str(image_path), encodings=encodings, model=args.model).show()
         return
 
-    run(args.model)
+    run(encodings, model=args.model)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import pickle
 from collections import Counter
 from os import name
 from pathlib import Path
+from typing import Any
 
 import cv2
 import face_recognition
@@ -12,6 +13,23 @@ from PIL import Image, ImageDraw, ImageFont
 from . import configs, exceptions
 
 logger = logging.getLogger(__name__)
+
+
+def load_encodings(model: str = configs.DEFAULT_MODEL):
+    """
+    The function `load_encodings` loads and returns the encodings stored in a pickle file.
+
+    :param model: The `model` parameter is a string that represents the name of the model. It is used to
+    construct the path to the encodings file. If no value is provided for `model`, it will default to
+    `configs.DEFAULT_MODEL`
+    :type model: str
+    :return: the encodings loaded from the specified file.
+    """
+    encodings_path = Path(configs.OUTPUT_PATH, f"{model}_encodings.pkl")
+    encodings = None
+    with encodings_path.open(mode="rb") as f:
+        encodings = pickle.load(f)
+    return encodings
 
 
 def existsDataset():
@@ -35,13 +53,13 @@ def existsDataset():
     )
 
 
-def encode_known_faces(model: str = "hog") -> None:
+def encode_known_faces(model: str = configs.DEFAULT_MODEL) -> None:
     """
     The function `encode_known_faces` encodes known faces from a dataset and saves the encodings to a
     file.
 
     :param model: The "model" parameter is a string that specifies the face detection model to be used.
-    It can be set to either "hog" or "cnn". The "hog" model is faster but less accurate, while the "cnn"
+    It can be set to either configs.DEFAULT_MODEL or "cnn". The configs.DEFAULT_MODEL model is faster but less accurate, while the "cnn"
     model is slower but more accurate, defaults to hog
     :type model: str (optional)
     """
@@ -170,28 +188,27 @@ def __draw_faces(image: np.ndarray, bounding_boxes: list[tuple], names: list[str
 
 def recognize_face(
     image: str | np.ndarray,
-    model: str = "hog",
+    encodings: Any,
+    model: str = configs.DEFAULT_MODEL,
 ) -> Image.Image:
     """
-    The `recognize_face` function takes an image and a model as input, loads pre-trained face encodings,
-    detects faces in the input image, matches the detected faces with the loaded encodings, and returns
-    the input image with bounding boxes and names drawn around the recognized faces.
+    The `recognize_face` function takes an image and a set of face encodings, and returns the image with
+    recognized faces highlighted.
 
-    :param image: The `image` parameter is the input image that you want to recognize faces in. It can
-    be either a string representing the path to the image file or a NumPy array representing the image
-    itself
+    :param image: The `image` parameter can be either a string representing the file path of an image or
+    a numpy array representing the image itself
     :type image: str | np.ndarray
-    :param model: The `model` parameter in the `recognize_face` function is used to specify the face
-    detection model to be used. The default value is set to "hog", which stands for Histogram of
-    Oriented Gradients. This is a popular and relatively fast face detection algorithm. Other possible
-    values for the, defaults to hog
-    :type model: str (optional)
+    :param encodings: The `encodings` parameter is a collection of known face encodings. These encodings
+    are used to compare and match with the face encodings extracted from the input image. The
+    `encodings` parameter can be of any type, but it should contain the face encodings in a format that
+    can
+    :type encodings: Any
+    :param model: The `model` parameter is a string that specifies the face detection model to be used.
+    It is set to `configs.DEFAULT_MODEL` by default, which means it will use the default face detection
+    model specified in the `configs` module. You can change the value of `model` to use a
+    :type model: str
     :return: The function `recognize_face` returns an instance of the `Image.Image` class.
     """
-    encodings_path = Path(configs.OUTPUT_PATH, f"{model}_encodings.pkl")
-    with encodings_path.open(mode="rb") as f:
-        loaded_encodings = pickle.load(f)
-
     if isinstance(image, np.ndarray):
         input_image = image
     else:
@@ -206,7 +223,7 @@ def recognize_face(
     for bounding_box, unknown_encoding in zip(
         input_face_locations, input_face_encodings
     ):
-        names.append(__match_encodings(unknown_encoding, loaded_encodings) or "Unknown")
+        names.append(__match_encodings(unknown_encoding, encodings) or "Unknown")
         bounding_boxes.append(bounding_box)
 
     logger.debug("Names: %s", names)
@@ -214,43 +231,57 @@ def recognize_face(
     return __draw_faces(input_image, bounding_boxes, names)
 
 
-def validate(model: str = "hog"):
+def validate(encodings: Any, model: str = configs.DEFAULT_MODEL):
     """
-    The function `validate` iterates over files in a validation directory and calls the `recognize_face`
-    function on each file, passing the file path and a specified model as arguments.
+    The function validates image encodings by iterating through image files and displaying recognized
+    faces.
 
-    :param model: The `model` parameter is a string that specifies the type of face recognition model to
-    use. In this case, the default value is set to "hog", defaults to hog
-    :type model: str (optional)
+    :param encodings: The `encodings` parameter is a variable that represents the facial encodings of
+    known faces. These encodings are typically generated using a face recognition algorithm and are used
+    to compare and recognize faces in images or videos
+    :type encodings: Any
+    :param model: The `model` parameter is a string that represents the model to be used for face
+    recognition. It is set to the value of `configs.DEFAULT_MODEL` by default
+    :type model: str
+    :return: The code is returning if the filepath is not a file.
     """
-
     for format in configs.IMAGE_FORMATS:
         for filepath in configs.VALIDATION_PATH.rglob(rf"*/*.{format}"):
             if not filepath.is_file():
                 return
 
-            recognize_face(image=str(filepath.absolute()), model=model).show()
+            recognize_face(
+                image=str(filepath.absolute()),
+                encodings=encodings,
+                model=model,
+            ).show()
 
 
 def run(
-    model: str = "hog",
+    encodings: Any,
+    model: str = configs.DEFAULT_MODEL,
     width: int = 1280,
     height: int = 720,
 ):
     """
-    The `run` function captures video from a webcam, sets the width and height of the video, and
-    continuously displays the video with recognized faces until the user presses the "q" key.
+    The `run` function captures video from a webcam, recognizes faces in the video using given encodings
+    and model, and displays the video with recognized faces highlighted until the user presses 'q'.
 
-    :param model: The "model" parameter is a string that specifies the face recognition model to be
-    used. In this code snippet, the default value is set to "hog", which stands for Histogram of
-    Oriented Gradients. This is a popular and relatively fast face detection algorithm. Other possible
-    values for the "model, defaults to hog
-    :type model: str (optional)
-    :param width: The `width` parameter specifies the desired width of the video frame captured from the
-    webcam, defaults to 1280
+    :param encodings: The `encodings` parameter is used to pass the face encodings that are used for
+    face recognition. These encodings are typically generated using a face recognition model and contain
+    the unique features of each face
+    :type encodings: Any
+    :param model: The `model` parameter is a string that specifies the face recognition model to be
+    used. It has a default value of `configs.DEFAULT_MODEL`, which suggests that there is a
+    configuration file named `configs` that contains a constant named `DEFAULT_MODEL`. The value of
+    `DEFAULT_MODEL` would determine which
+    :type model: str
+    :param width: The `width` parameter is used to set the width of the video capture frame. It
+    determines the width of the video stream that will be captured from the webcam. The default value is
+    set to 1280 pixels, defaults to 1280
     :type width: int (optional)
-    :param height: The `height` parameter is used to set the height of the video frame captured by the
-    webcam. It determines the vertical resolution of the video, defaults to 720
+    :param height: The `height` parameter is used to set the height of the video capture frame. It
+    determines the height of the video frame in pixels, defaults to 720
     :type height: int (optional)
     """
     cap = cv2.VideoCapture(0)
@@ -259,7 +290,7 @@ def run(
 
     while True:
         ret, img = cap.read()
-        drawn_image = recognize_face(img, model)
+        drawn_image = recognize_face(img, encodings=encodings, model=model)
         cv2.imshow("Webcam", np.array(drawn_image))
 
         if cv2.waitKey(1) == ord("q"):
