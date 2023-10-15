@@ -76,8 +76,11 @@ def encode(model: str = configs.DEFAULT_MODEL) -> None:
             name = filepath.parent.name
             image = face_recognition.load_image_file(filepath)
 
-            face_locations = face_recognition.face_locations(image, model=model)
-            face_encodings = face_recognition.face_encodings(image, face_locations)
+            # Resize frame of video to 1/4 size for faster face recognition processing
+            frame = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
+
+            face_locations = face_recognition.face_locations(frame, model=model)
+            face_encodings = face_recognition.face_encodings(frame, face_locations)
 
             for encoding in face_encodings:
                 names.append(name)
