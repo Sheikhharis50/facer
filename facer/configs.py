@@ -11,11 +11,14 @@ UNKNOWN_PATH = Path(DATASET_PATH, "unknown")
 
 OUTPUT_PATH = Path("output")
 
+DEFAULT_MODEL = "hog"
+
 BOUNDING_BOX_COLOR = "blue"
 
 TEXT_COLOR = "white"
 
 IMAGE_FORMATS = ["png", "jpg", "jpeg"]
+
 
 LOGGING = {
     "version": 1,
@@ -37,7 +40,7 @@ LOGGING = {
     "loggers": {
         "root": {
             "handlers": ["console"],
-            "level": logging.INFO,
+            "level": logging.DEBUG,
             "propagate": False,
         },
     },

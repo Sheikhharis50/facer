@@ -1,23 +1,37 @@
-from argparse import ArgumentError, ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace
 from logging import config
 from pathlib import Path
 
 from facer.configs import LOGGING
-from facer.service import encode_known_faces, recognize_face, validate
+from facer.service import (
+    draw_faces,
+    encode,
+    load_encodings,
+    recognize_face,
+    run,
+    validate,
+)
 
 
 def main(args: Namespace):
     if args.encode:
-        encode_known_faces(args.model)
+        encode(args.model)
+    encodings = load_encodings(args.model)
 
     if args.validate:
         validate(args.model)
+        return
 
     if args.image:
-        if (image_path := Path(args.image)).exists():
-            recognize_face(str(image_path), args.model)
-        else:
+        if not (image_path := Path(args.image)).exists():
             raise FileNotFoundError(str(image_path))
+
+        draw_faces(
+            *recognize_face(str(image_path), encodings=encodings, model=args.model)
+        )
+        return
+
+    run(encodings, model=args.model)
 
 
 if __name__ == "__main__":
@@ -46,12 +60,6 @@ if __name__ == "__main__":
         action="store_true",
     )
     args = parser.parse_args()
-
-    if not args.validate and not args.image:
-        raise ArgumentError(
-            argument=None,
-            message="Either validate flag should be given or image should be provided",
-        )
 
     # Setup Logging
     config.dictConfig(LOGGING)
