@@ -3,18 +3,12 @@ from logging import config
 from pathlib import Path
 
 from facer.configs import LOGGING
-from facer.service import (
-    encode_known_faces,
-    load_encodings,
-    recognize_face,
-    run,
-    validate,
-)
+from facer.service import encode, load_encodings, recognize_face, run, validate
 
 
 def main(args: Namespace):
     if args.encode:
-        encode_known_faces(args.model)
+        encode(args.model)
     encodings = load_encodings(args.model)
 
     if args.validate:

@@ -53,9 +53,9 @@ def existsDataset():
     )
 
 
-def encode_known_faces(model: str = configs.DEFAULT_MODEL) -> None:
+def encode(model: str = configs.DEFAULT_MODEL) -> None:
     """
-    The function `encode_known_faces` encodes known faces from a dataset and saves the encodings to a
+    The function `encode` encodes known faces from a dataset and saves the encodings to a
     file.
 
     :param model: The "model" parameter is a string that specifies the face detection model to be used.
