@@ -232,18 +232,25 @@ def validate(model: str = "hog"):
             recognize_face(image=str(filepath.absolute()), model=model).show()
 
 
-def run(width: int = 1280, height: int = 720):
+def run(
+    model: str = "hog",
+    width: int = 1280,
+    height: int = 720,
+):
     """
-    The function captures video from a webcam, sets the width and height of the video, continuously
-    reads frames from the video, recognizes faces in each frame, and displays the frames with recognized
-    faces in a window until the user presses "q".
+    The `run` function captures video from a webcam, sets the width and height of the video, and
+    continuously displays the video with recognized faces until the user presses the "q" key.
 
-    :param width: The `width` parameter is used to set the width of the video capture window. It
-    determines the width of the video frame that will be captured from the webcam. The default value is
-    set to 1280 pixels, defaults to 1280
+    :param model: The "model" parameter is a string that specifies the face recognition model to be
+    used. In this code snippet, the default value is set to "hog", which stands for Histogram of
+    Oriented Gradients. This is a popular and relatively fast face detection algorithm. Other possible
+    values for the "model, defaults to hog
+    :type model: str (optional)
+    :param width: The `width` parameter specifies the desired width of the video frame captured from the
+    webcam, defaults to 1280
     :type width: int (optional)
-    :param height: The `height` parameter is used to set the height of the video capture window. It
-    determines the vertical size of the video frame that will be displayed, defaults to 720
+    :param height: The `height` parameter is used to set the height of the video frame captured by the
+    webcam. It determines the vertical resolution of the video, defaults to 720
     :type height: int (optional)
     """
     cap = cv2.VideoCapture(0)
@@ -252,7 +259,7 @@ def run(width: int = 1280, height: int = 720):
 
     while True:
         ret, img = cap.read()
-        drawn_image = recognize_face(img)
+        drawn_image = recognize_face(img, model)
         cv2.imshow("Webcam", np.array(drawn_image))
 
         if cv2.waitKey(1) == ord("q"):

@@ -21,7 +21,7 @@ def main(args: Namespace):
         recognize_face(str(image_path), args.model).show()
         return
 
-    run()
+    run(args.model)
 
 
 if __name__ == "__main__":
